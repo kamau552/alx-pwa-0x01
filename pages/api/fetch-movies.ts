@@ -1,50 +1,48 @@
-import { MoviesProps } from "@/interfaces";
 import { NextApiRequest, NextApiResponse } from "next";
 
-export default async function handler(request: NextApiRequest, response: NextApiResponse) {
-  if (request.method !== "POST") {
-    response.setHeader("Allow", ["POST"]);
-    return response.status(405).end(`Method ${request.method} Not Allowed`);
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", ["POST"]);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
   try {
-    const { year, page, genre } = request.body;
-    const currentYear = new Date().getFullYear();
+    const { page = 1, year, genre } = req.body;
 
-    // Build query parameters safely
     const query = new URLSearchParams({
-      year: `${year || currentYear}`,
-      sort: "year.decr",
-      limit: "12",
+      apikey: process.env.OMDB_API_KEY!,
+      s: genre && genre !== "All" ? genre : "movie", // fallback search term
+      y: year || "",
       page: `${page}`,
+      type: "movie"
     });
 
-    if (genre) {
-      query.append("genre", genre);
+    const url = `https://www.omdbapi.com/?${query.toString()}`;
+
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (data.Response === "False") {
+      return res.status(404).json({ movies: [], message: data.Error });
     }
 
-    const url = `https://moviesdatabase.p.rapidapi.com/titles?${query.toString()}`;
-
-    const resp = await fetch(url, {
-      method: "GET",
-      headers: {
-        "X-RapidAPI-Key": process.env.MOVIE_API_KEY!,
-        "X-RapidAPI-Host": "moviesdatabase.p.rapidapi.com",
-      },
-    });
-
-    if (!resp.ok) {
-      const errorDetails = await resp.text();
-      console.error("Failed to fetch movies. API response:", errorDetails);
-      throw new Error("Failed to fetch movies");
+    interface OmdbMovie {
+      Title: string;
+      Year: string;
+      Poster: string;
+      [key: string]: any;
     }
 
-    const moviesResponse = await resp.json();
-    const movies: MoviesProps[] = moviesResponse.results;
+    const movies = (data.Search as OmdbMovie[]).map((movie) => ({
+      titleText: { text: movie.Title },
+      primaryImage: { url: movie.Poster !== "N/A" ? movie.Poster : "/fallback.jpg" },
+      releaseYear: { year: Number(movie.Year) },
+    }));
 
-    return response.status(200).json({ movies });
+    return res.status(200).json({ movies });
+
   } catch (error) {
-    console.error("API Route Error:", error);
-    return response.status(500).json({ message: "Server error: Unable to fetch movies" });
+    console.error("OMDb API error:", error);
+    return res.status(500).json({ message: "Failed to fetch movies" });
   }
 }
