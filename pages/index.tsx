@@ -1,6 +1,5 @@
 import Button from "@/components/commons/Button";
 import { useRouter } from "next/router";
-import styles from "./index.module.css";
 const Home: React.FC = () => {
   const router = useRouter();
 
