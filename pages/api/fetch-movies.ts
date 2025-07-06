@@ -30,7 +30,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       Title: string;
       Year: string;
       Poster: string;
-      [key: string]: any;
+      imdbID?: string;
+      Type?: string;
+      // Add other known OMDb fields here if needed
     }
 
     const movies = (data.Search as OmdbMovie[]).map((movie) => ({
